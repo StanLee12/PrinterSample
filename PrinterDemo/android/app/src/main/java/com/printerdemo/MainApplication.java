@@ -9,6 +9,7 @@ import com.facebook.react.ReactNativeHost;
 import com.facebook.react.ReactPackage;
 import com.facebook.react.shell.MainReactPackage;
 import com.microsoft.codepush.react.CodePush;
+import com.imagepicker.ImagePickerPackage;
 
 import java.util.Arrays;
 import java.util.List;
@@ -32,7 +33,8 @@ public class MainApplication extends Application implements ReactApplication {
             return Arrays.<ReactPackage>asList(
                     new MainReactPackage(),
                     new BluetoothPackage(),
-                    new CodePush("8WadUIv6qJlWjuTDB598NdiKWzdlVkzeRLvhZ", MainApplication.this, BuildConfig.DEBUG)
+                    new CodePush("8WadUIv6qJlWjuTDB598NdiKWzdlVkzeRLvhZ", MainApplication.this, BuildConfig.DEBUG),
+                    new ImagePickerPackage()
             );
         }
     };

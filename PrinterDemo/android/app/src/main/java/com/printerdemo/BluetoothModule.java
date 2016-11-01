@@ -5,7 +5,12 @@ import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.support.annotation.Nullable;
+import android.util.Log;
+import android.widget.Toast;
 
 import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -29,13 +34,13 @@ import java.util.Vector;
  */
 public class BluetoothModule extends ReactContextBaseJavaModule {
 
-    private final String BLUETOOTH = "BluetoothModule";
+    private final static String BLUETOOTH_MODULE = "BluetoothModule";
 
     private BluetoothUtil mBluetoothUtil = null;
 
-    private ArrayList<BluetoothDevice> mBondList = null;
+    private ArrayList<BluetoothDevice> mBondDevices = null;
 
-    private ArrayList<BluetoothDevice> mUnbondList = null;
+    private ArrayList<BluetoothDevice> mUnbondDevices = null;
 
     private BluetoothPort mPort = null;
 
@@ -43,16 +48,17 @@ public class BluetoothModule extends ReactContextBaseJavaModule {
 
     private Vector<Byte> datas = null;
 
+
     public BluetoothModule(ReactApplicationContext reactContext) {
         super(reactContext);
         mBluetoothUtil = new BluetoothUtil(BluetoothAdapter.getDefaultAdapter());
-        mBondList = new ArrayList<>();
-        mUnbondList = new ArrayList<>();
+        mBondDevices = new ArrayList<>();
+        mUnbondDevices = new ArrayList<>();
     }
 
     @Override
     public String getName() {
-        return BLUETOOTH;
+        return BLUETOOTH_MODULE;
     }
 
     /**
@@ -89,37 +95,35 @@ public class BluetoothModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void getBondedDevices(Callback callback) {
         ArrayList<BluetoothDevice> btDevices = mBluetoothUtil.getBondedDevices();
-        WritableArray array = new WritableNativeArray();
-        WritableMap map = new WritableNativeMap();
+        WritableArray devices = new WritableNativeArray();
         for (int i = 0; i < btDevices.size(); i++) {
-            //已配对设备集合
 
-            map.putString("deviceName", btDevices.get(i).getName());
-            map.putString("deviceAddress", btDevices.get(i).getAddress());
-            //已配对设备集合
-            mBondList.add(btDevices.get(i));
+            WritableMap bondedDevices = new WritableNativeMap();
+            bondedDevices.putString("deviceName", btDevices.get(i).getName());
+            bondedDevices.putString("deviceAddress", btDevices.get(i).getAddress());
 
+            mBondDevices.add(btDevices.get(i));
+            devices.pushMap(bondedDevices);
         }
-        callback.invoke(map);
-
+        callback.invoke(devices);
     }
 
 
     /**
-     * 开始搜索设备｀
+     * 开始搜索设备
      *
      * @param
      */
     @ReactMethod
-    public void discoveryhDevices() {
-        mBluetoothUtil.registerBluetoothReceiver(getReactApplicationContext(), receiver);
+    public void searchDevices() {
+        mBluetoothUtil.registerBluetoothReceiver(getReactApplicationContext(), searchDevicesReceiver);
         mBluetoothUtil.startDiscoveryDevices();
     }
 
     /**
      * 搜索设备的广播
      */
-    public BroadcastReceiver receiver = new BroadcastReceiver() {
+    public BroadcastReceiver searchDevicesReceiver = new BroadcastReceiver() {
         String unbondAddress = "";
         String bondedAddress = "";
 
@@ -131,25 +135,14 @@ public class BluetoothModule extends ReactContextBaseJavaModule {
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 if (device.getBondState() != BluetoothDevice.BOND_BONDED) {
                     if (!unbondAddress.equals(device.getAddress())) {
-                        mUnbondList.add(device);
-                        WritableMap map = new WritableNativeMap();
-                        map.putString("deviceName", device.getName());
-                        map.putString("deviceAddress", device.getAddress());
-                        sendUnbond(getReactApplicationContext(), "getUnbondDevices", map);
+                        mUnbondDevices.add(device);
+                        WritableMap unBondDevices = new WritableNativeMap();
+                        unBondDevices.putString("deviceName", device.getName());
+                        unBondDevices.putString("deviceAddress", device.getAddress());
+                        sendUnbondDevice(getReactApplicationContext(), "getUnbondDevices", unBondDevices);
                         unbondAddress = device.getAddress();
                     }
-                } else {
-                    //判断是否重复添加
-                    if (bondedAddress.equals(device.getAddress()) == false) {
-                        mBondList.add(device);
-                        WritableMap map = new WritableNativeMap();
-                        map.putString("deviceName", device.getName());
-                        map.putString("deviceAddress", device.getAddress());
-                        sendBonded(getReactApplicationContext(), "getBondedDevices", map);
-                        bondedAddress = device.getAddress();
-                    }
                 }
-
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 //搜索结束解除注册
                 getReactApplicationContext().unregisterReceiver(this);
@@ -158,6 +151,7 @@ public class BluetoothModule extends ReactContextBaseJavaModule {
         }
     };
 
+
     /**
      * 搜索设备并发送未配对设备信息的监听方法
      *
@@ -165,7 +159,7 @@ public class BluetoothModule extends ReactContextBaseJavaModule {
      * @param eventName    事件名称
      * @param param        发送的参数
      */
-    private void sendUnbond(ReactContext reactContext, String eventName, @Nullable WritableMap param) {
+    private void sendUnbondDevice(ReactContext reactContext, String eventName, @Nullable WritableMap param) {
         reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit(eventName, param);
     }
 
@@ -176,7 +170,7 @@ public class BluetoothModule extends ReactContextBaseJavaModule {
      * @param eventName
      * @param param
      */
-    private void sendBonded(ReactContext reactContext, String eventName, @Nullable WritableMap param) {
+    private void sendBondedDevice(ReactContext reactContext, String eventName, @Nullable WritableMap param) {
         reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit(eventName, param);
     }
 
@@ -190,29 +184,36 @@ public class BluetoothModule extends ReactContextBaseJavaModule {
     public void bondDevice(String deviceAddress, Callback callback) {
         boolean isBonded = false;
 
-        for (int i = 0; i < mUnbondList.size(); i++) {
-            if (mUnbondList.get(i).getAddress().equals(deviceAddress)) {
-                isBonded = mBluetoothUtil.bondDevice(mUnbondList.get(i));
+        for (int i = 0; i < mUnbondDevices.size(); i++) {
+            if (mUnbondDevices.get(i).getAddress().equals(deviceAddress)) {
+                isBonded = mBluetoothUtil.bondDevice(mUnbondDevices.get(i));
             }
         }
 
         callback.invoke(isBonded);
     }
 
+    /**
+     * 连接打印机
+     *
+     * @param deviceAddress
+     */
     @ReactMethod
-    public void connect(String deviceAddress) {
+    public void connectPrinter(String deviceAddress) {
         BluetoothDevice device = null;
-        for (int i = 0; i < mBondList.size(); i++) {
-            if (mBondList.get(i).getAddress().equals(deviceAddress)) {
-                device = mBondList.get(i);
+        for (int i = 0; i < mBondDevices.size(); i++) {
+            if (mBondDevices.get(i).getAddress().equals(deviceAddress)) {
+                device = mBondDevices.get(i);
             }
         }
         mPort = new BluetoothPort(device);
     }
 
+    /**
+     * 打印测试
+     */
     @ReactMethod
     public void printTest() {
-
 
         mCommand.addSelectJustification(EscCommand.JUSTIFICATION.CENTER);
 
@@ -249,11 +250,26 @@ public class BluetoothModule extends ReactContextBaseJavaModule {
         mPort.sendESC(datas);
     }
 
+    /**
+     * 初始化打印机
+     */
     @ReactMethod
-    public void addHorTab() {
-        mCommand.addHorTab();
+    public void initializePrinter() {
+
+        boolean connected = mPort.connect();
+        if (connected) {
+            mCommand = new EscCommand();
+            mCommand.addInitializePrinter();
+        }
+
     }
 
+
+    /**
+     * 添加文本
+     *
+     * @param str 字符串
+     */
     @ReactMethod
     public void addText(String str) {
         mCommand.addText(str, "UTF-8");
@@ -265,6 +281,9 @@ public class BluetoothModule extends ReactContextBaseJavaModule {
         mCommand.addPrintAndLineFeed();
     }
 
+    /**
+     * 走纸一行
+     */
     @ReactMethod
     public void addFeedLine() {
         mCommand.addPrintAndLineFeed();
@@ -275,33 +294,72 @@ public class BluetoothModule extends ReactContextBaseJavaModule {
         mCommand.addPrintAndFeedLines((byte) lines);
     }
 
+    /**
+     * 打印条形码
+     *
+     * @param content   条形码内容
+     * @param barWidth  条形码每条的宽
+     * @param barHeight 条形码的高
+     */
     @ReactMethod
-    public void cutPage() {
-        mCommand.addCutPaper();
+    public void addBarCode(String content, int barWidth, int barHeight) {
+        mCommand.addSelectPrintingPositionForHRICharacters(EscCommand.HRI_POSITION.BELOW);
+        mCommand.addSetBarcodeWidth((byte) barWidth);
+        mCommand.addSetBarcodeHeight((byte) barHeight);
+        mCommand.addUPCA(content);
     }
 
+    /**
+     * 打印二维码
+     *
+     * @param content 二维码内容
+     * @param size    二维码大小
+     */
+    @ReactMethod
+    public void addQRCode(String content, int size) {
+        mCommand.addSelectErrorCorrectionLevelForQRCode((byte) 0x31);
+        mCommand.addSelectSizeOfModuleForQRCode((byte) size);
+        mCommand.addStoreQRCodeData(content);
+        mCommand.addPrintQRCode();
+    }
+
+    /**
+     * 设置后面的内容居于纸的左侧
+     */
     @ReactMethod
     public void alignInPageLeft() {
         mCommand.addSelectJustification(EscCommand.JUSTIFICATION.LEFT);
     }
 
+    /**
+     * 设置后面的内容居于纸的正中间
+     */
     @ReactMethod
     public void alignInPageCenter() {
         mCommand.addSelectJustification(EscCommand.JUSTIFICATION.CENTER);
     }
 
+    /**
+     * 设置后面的内容居于纸的右侧
+     */
     @ReactMethod
     public void alignInPageRight() {
         mCommand.addSelectJustification(EscCommand.JUSTIFICATION.RIGHT);
     }
 
+    /**
+     * 设置后面的文本字体为普通大小
+     */
     @ReactMethod
-    public void setTextSizeZoom1() {
+    public void setFontSizeNormal() {
         mCommand.addSetCharcterSize(EscCommand.WIDTH_ZOOM.MUL_1, EscCommand.HEIGHT_ZOOM.MUL_1);
     }
 
+    /**
+     * 设置后面的文本字体为两倍大小
+     */
     @ReactMethod
-    public void setTextSizeZoom2() {
+    public void setFontSizeDouble() {
         mCommand.addSetCharcterSize(EscCommand.WIDTH_ZOOM.MUL_2, EscCommand.HEIGHT_ZOOM.MUL_2);
     }
 
@@ -315,59 +373,74 @@ public class BluetoothModule extends ReactContextBaseJavaModule {
         mCommand.addSetFontForHRICharacter(EscCommand.FONT.FONTB);
     }
 
+    /**
+     * 设置绝对位置
+     *
+     * @param n
+     */
     @ReactMethod
     public void setPosition(int n) {
         mCommand.addSetAbsolutePrintPosition((short) n);
     }
 
+    /**
+     * 左边距
+     *
+     * @param marginLeft
+     */
     @ReactMethod
     public void setMarginLeft(int marginLeft) {
         mCommand.addSetLeftMargin((short) marginLeft);
     }
 
 
-    @ReactMethod
-    public void setMarginRight(int marginRight) {
-        mCommand.addSetRightSideCharacterSpacing((byte) marginRight);
-    }
-
-    @ReactMethod
-    public void initPrinter() {
-
-        boolean isConnection = mPort.connect();
-        if (isConnection) {
-            mCommand = new EscCommand();
-            mCommand.addInitializePrinter();
-        }
-
-    }
-
+    /**
+     * 设置图片的相对位置
+     *
+     * @param r
+     */
     @ReactMethod
     public void setRelative(int r) {
         mCommand.addSetRelativePrintPositon((short) r);
     }
 
+
+    /**
+     * 打印图片,传入图片的路径uri
+     *
+     * @param path
+     */
     @ReactMethod
-    public void setPageMode() {
-        mCommand.setPageMode();
+    public void addImage(String path) {
+        Bitmap image = BitmapFactory.decodeFile(path);
+        mCommand.addRastBitImage(image, image.getWidth(), 0);
     }
 
-    @ReactMethod
-    public void setStandradMode() {
-        mCommand.setStandardMode();
-    }
 
-    @ReactMethod
-    public void standradMode() {
-        mCommand.standardMode();
-    }
-
+    /**
+     * 打印空格,同一行中
+     *
+     * @param s 空格的个数
+     */
     @ReactMethod
     public void addSpaces(int s) {
         for (int i = 0; i < s; i++) {
             mCommand.addSpace();
         }
     }
+
+    /**
+     * 切纸
+     */
+    @ReactMethod
+    public void cutPage() {
+        mCommand.addCutPaper();
+    }
+
+
+    /**
+     * 执行打印
+     */
     @ReactMethod
     public void print() {
         datas = mCommand.getCommand();
@@ -376,8 +449,11 @@ public class BluetoothModule extends ReactContextBaseJavaModule {
         mCommand = null;
     }
 
+    /**
+     * 断开打印机的连接
+     */
     @ReactMethod
-    public void disConnect() {
+    public void disconnectPrinter() {
         if (mPort != null) {
             mPort.disconnect();
             mPort = null;

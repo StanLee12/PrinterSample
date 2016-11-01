@@ -3,11 +3,6 @@ package com.printerdemo;
 /**
  * Created by Stan on 16/9/12.
  */
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by Fernflower decompiler)
-//
-
 import android.annotation.SuppressLint;
 import android.graphics.Bitmap;
 import android.util.Log;
@@ -460,8 +455,8 @@ public class EscCommand {
         this.addArrayToCommand(command);
     }
 
- /*   public void addRastBitImage(Bitmap bitmap, int nWidth, int nMode) {
-        if(bitmap != null) {
+    public void addRastBitImage(Bitmap bitmap, int nWidth, int nMode) {
+        if (bitmap != null) {
             int width = (nWidth + 7) / 8 * 8;
             int height = bitmap.getHeight() * width / bitmap.getWidth();
             Bitmap grayBitmap = GpUtils.toGrayscale(bitmap);
@@ -472,34 +467,34 @@ public class EscCommand {
             command[0] = 29;
             command[1] = 118;
             command[2] = 48;
-            command[3] = (byte)(nMode & 1);
-            command[4] = (byte)(width / 8 % 256);
-            command[5] = (byte)(width / 8 / 256);
-            command[6] = (byte)(height % 256);
-            command[7] = (byte)(height / 256);
+            command[3] = (byte) (nMode & 1);
+            command[4] = (byte) (width / 8 % 256);
+            command[5] = (byte) (width / 8 / 256);
+            command[6] = (byte) (height % 256);
+            command[7] = (byte) (height / 256);
             this.addArrayToCommand(command);
-            byte[] codecontent = GpUtils.pixToEscRastBitImageCmd(src);
+            byte[] codecontent = BitmapUtils.pixToEscRastBitImageCmd(src);
 
-            for(int k = 0; k < codecontent.length; ++k) {
+            for (int k = 0; k < codecontent.length; ++k) {
                 this.Command.add(Byte.valueOf(codecontent[k]));
             }
         } else {
             Log.d("BMP", "bmp.  null ");
         }
 
-    }*/
+    }
 
-/*    public void addDownloadNvBitImage(Bitmap[] bitmap) {
-        if(bitmap == null) {
+    public void addDownloadNvBitImage(Bitmap[] bitmap) {
+        if (bitmap == null) {
             Log.d("BMP", "bmp.  null ");
         } else {
             Log.d("BMP", "bitmap.length " + bitmap.length);
             int n = bitmap.length;
-            if(n > 0) {
-                byte[] command = new byte[]{(byte)28, (byte)113, (byte)n};
+            if (n > 0) {
+                byte[] command = new byte[]{(byte) 28, (byte) 113, (byte) n};
                 this.addArrayToCommand(command);
 
-                for(int i = 0; i < n; ++i) {
+                for (int i = 0; i < n; ++i) {
                     int height = (bitmap[i].getHeight() + 7) / 8 * 8;
                     int width = bitmap[i].getWidth() * height / bitmap[i].getHeight();
                     Bitmap grayBitmap = GpUtils.toGrayscale(bitmap[i]);
@@ -508,16 +503,16 @@ public class EscCommand {
                     height = src.length / width;
                     Log.d("BMP", "bmp  Width " + width);
                     Log.d("BMP", "bmp  height " + height);
-                    byte[] codecontent = GpUtils.pixToEscNvBitImageCmd(src, width, height);
+                    byte[] codecontent = BitmapUtils.pixToEscNvBitImageCmd(src, width, height);
 
-                    for(int k = 0; k < codecontent.length; ++k) {
+                    for (int k = 0; k < codecontent.length; ++k) {
                         this.Command.add(Byte.valueOf(codecontent[k]));
                     }
                 }
             }
 
         }
-    }*/
+    }
 
     public void addPrintNvBitmap(byte n, byte mode) {
         byte[] command = new byte[]{(byte) 28, (byte) 112, n, mode};

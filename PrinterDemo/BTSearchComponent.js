@@ -10,30 +10,39 @@ import {
     TouchableOpacity,
     Alert,
     ListView,
+    Image,
+    DeviceEventEmitter,
+    ToastAndroid,
 } from 'react-native';
 import Bluetooth from './Bluetooth';
 import CodePush from 'react-native-code-push';
 
-var ds = new ListView.DataSource({rowHasChanged: (r1, r2)=>r1 != r2});
-
+const bondedDatasource = new ListView.DataSource({rowHasChanged: (r1, r2)=>r1 != r2});
+const unbondDatasource = new ListView.DataSource({rowHasChanged: (r1, r2)=>r1 != r2});
 
 class BTSearchComponent extends Component {
     constructor(props) {
         super(props);
         this.state = {
-            dataSource: ds.cloneWithRows([]),
+            bondedDevices: bondedDatasource.cloneWithRows([]),
+            unBondDevices: unbondDatasource.cloneWithRows([]),
         }
     }
 
-    componentWillUnmount() {
-        Bluetooth.disConnect();
-        CodePush.disallowRestart();
+    componentWillMount() {
+        this.fetchBondedDevices();
     }
 
-    componentWillUnmount() {
-        // Reallow restarts, and optionally trigger
-        // a restart if one was currently pending.
-        CodePush.allowRestart();
+    fetchBondedDevices() {
+        let bondedArray = [];
+        Bluetooth.getBondedDevices((array)=> {
+            for (let device of array) {
+                bondedArray.push(device);
+            }
+            this.setState({
+                bondedDevices: this.state.bondedDevices.cloneWithRows(bondedArray),
+            })
+        });
     }
 
     componentDidMount() {
@@ -64,22 +73,40 @@ class BTSearchComponent extends Component {
     render() {
         return (
             <View style={styles.container}>
+                <Text>已配对设备</Text>
                 <ListView
-                    dataSource={this.state.dataSource}
-                    renderRow={this.renderRows.bind(this)}
+                    dataSource={this.state.bondedDevices}
+                    renderRow={this.renderBondedDeviceRows.bind(this)}
                     enableEmptySections={true}
                 />
-
+                <Text>未配对设备</Text>
+                <ListView
+                    dataSource={this.state.unBondDevices}
+                    renderRow={this.renderUnbondDeviceRows.bind(this)}
+                    enableEmptySections={true}
+                />
                 <TouchableOpacity style={styles.button} onPress={this.checkEnabled.bind(this)}>
-                    <Text>搜索增加Notify的第二个版本</Text>
+                    <Text>搜索</Text>
                 </TouchableOpacity>
             </View>
         );
     }
 
-    renderRows(rowData) {
+    renderBondedDeviceRows(rowData) {
         return (
-            <TouchableOpacity style={styles.button} onPress={()=> {
+            <TouchableOpacity style={styles.row} onPress={()=> {
+                this.toPrintPage(rowData)
+            }}>
+                <Text>
+                    {rowData.deviceName + "/" + rowData.deviceAddress}
+                </Text>
+            </TouchableOpacity>
+        );
+    }
+
+    renderUnbondDeviceRows(rowData) {
+        return (
+            <TouchableOpacity style={styles.row} onPress={()=> {
                 this.toPrintPage(rowData)
             }}>
                 <Text>
@@ -110,7 +137,7 @@ class BTSearchComponent extends Component {
     }
 
     doGenRowDatas(result) {
-        var bondedArray = [];
+        let unbondArray = [];
         Alert.alert(
             '蓝牙状态',
             '蓝牙已开启,是否搜索',
@@ -122,16 +149,20 @@ class BTSearchComponent extends Component {
             }, {
                 text: 'ok',
                 onPress: ()=> {
-                    //每次搜索需要清空之前的数据
                     this.setState({
-                        dataSource: ds.cloneWithRows([]),
+                        unBondDevices: this.state.unBondDevices.cloneWithRows([]),
                     })
-                    Bluetooth.getBondedDevices((devices)=> {
-                        bondedArray.push(devices);
+
+                    Bluetooth.searchDevices();
+
+                    DeviceEventEmitter.addListener('getUnbondDevices', (map)=> {
+                        unbondArray.push(map);
                         this.setState({
-                            dataSource: ds.cloneWithRows(bondedArray),
+                            unBondDevices: this.state.unBondDevices.cloneWithRows(unbondArray),
                         })
                     });
+
+
                 }
 
             }]
@@ -168,6 +199,14 @@ const styles = StyleSheet.create({
         width: 300,
         height: 50,
         backgroundColor: "gray",
+        alignItems: "center",
+        justifyContent: 'center',
+        marginBottom: 10,
+    },
+    row: {
+        width: 300,
+        height: 50,
+        backgroundColor: "orange",
         alignItems: "center",
         justifyContent: 'center',
         marginBottom: 10,

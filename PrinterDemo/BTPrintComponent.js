@@ -10,42 +10,109 @@ import {
     TouchableOpacity,
     Alert,
     ListView,
+    Platform,
+    ToastAndroid,
+    Image,
 } from 'react-native';
 
+import ImagePicker from 'react-native-image-picker';
 import Printer from './Bluetooth';
-var TOTAL_CONSUMPTION = "消费合计";
-var MONEY = "188.00";
-var MONEY2 = "100.00";
-var PAY_METHOD = "支付宝支付";
+const TOTAL_CONSUMPTION = "消费合计";
+const MONEY = "188.00";
+const MONEY2 = "100.00";
+const PAY_METHOD = "支付宝支付";
+var options = {
+    title: '选择图片',
+    storageOptions: {
+        skipBackup: true,
+        path: 'images'
+    }
+}
 
 class BTPrintComponent extends Component {
     constructor(props) {
         super(props);
-        this.state = {}
+        this.state = {
+            imageSource: {}
+        }
     }
 
     componentWillMount() {
-        Printer.connect(this.props.data.deviceAddress);
+        Printer.connectPrinter(this.props.data.deviceAddress);
     }
 
     componentWillUnmount() {
-        Printer.disConnect();
+        Printer.disconnectPrinter();
     }
 
     render() {
         return (
             <View style={styles.container}>
-                <TouchableOpacity style={styles.button} onPress={this.printLocalReceipt.bind(this)}>
-                    <Text>打印</Text>
+                <TouchableOpacity style={styles.button} onPress={this.printTest.bind(this)}>
+                    <Text>打印条形码与二维码</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.button} onPress={this.printEnglishReceipt80.bind(this)}>
+                    <Text>打印英文版小票</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.button} onPress={this.printChineseReceipt80.bind(this)}>
+                    <Text>打印中文版小票</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.button} onPress={this.chooseImage.bind(this)}>
+                    <Text>选择图片打印</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={this.printImage.bind(this)}>
+                    <Image source={this.state.imageSource} style={styles.imageStyle}/>
                 </TouchableOpacity>
             </View>
         );
     }
 
-    printNationReceipt() {
-        Printer.initPrinter();
+    chooseImage() {
+        ImagePicker.showImagePicker(options, (response)=> {
+            if (response.customButton) {
+                ToastAndroid.show(response.customButton, ToastAndroid.LONG);
+            } else {
+                const source = {uri: 'data:image/jpeg;base64,' + response.data, isStatic: true};
+                if (Platform.OS === 'ios') {
+                    const source = {uri: response.uri.replace('file://', ''), isStatic: true};
+                } else {
+                    const source = {uri: response.uri, isStatic: true};
+                }
+                this.setState({
+                    imageSource: source,
+                    imagePath: response.path,
+                })
+            }
+        })
+    }
+
+    printImage() {
+        ToastAndroid.show("点击了图片", ToastAndroid.LONG);
+        Printer.initializePrinter();
         Printer.alignInPageCenter();
-        Printer.setTextSizeZoom1();
+        Printer.addTextAndFeedLine("打印图片");
+        Printer.addImage(this.state.imagePath);
+        Printer.addFeedLines(5);
+        Printer.cutPage();
+        Printer.print();
+    }
+
+    printTest() {
+        Printer.initializePrinter();
+        Printer.alignInPageCenter();
+        Printer.addTextAndFeedLine("打印机");
+        Printer.addBarCode("7894561237895", 2, 300);
+        Printer.addFeedLine();
+        Printer.addQRCode("this is qrcode", 5);
+        Printer.addFeedLines(5);
+        Printer.cutPage();
+        Printer.print();
+    }
+
+    printEnglishReceipt() {
+        Printer.initializePrinter();
+        Printer.alignInPageCenter();
+        Printer.setFontSizeNormal();
         Printer.addText("We're 100 per cent Chinese\n" +
             "restaurant with Chinese stuffs\n" +
             "and chefs." +
@@ -70,7 +137,6 @@ class BTPrintComponent extends Component {
         Printer.alignInPageLeft();
         Printer.addText("--------------------------------");
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.alignInPageLeft();
         Printer.addText("ORDERNUM: 100120");
         Printer.addFeedLine();
@@ -80,8 +146,6 @@ class BTPrintComponent extends Component {
         Printer.addFeedLine();
         Printer.addText("TABLENUM: A-01");
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
-        Printer.alignInPageLeft();
         Printer.addText("--------------------------------");
         Printer.addFeedLine();
         Printer.addText("ITEM");
@@ -95,17 +159,17 @@ class BTPrintComponent extends Component {
         Printer.addFeedLine();
         Printer.addText("--------------------------------");
         Printer.addFeedLine();
-        for (let i = 8; i < 13; i++) {
-            let str = i + "" + i + "" + i + "1.00";
+        for (let dishIndex = 8; dishIndex < 13; dishIndex++) {
+            let str = dishIndex + "" + dishIndex + "" + dishIndex + "1.00";
             Printer.alignInPageLeft();
             Printer.addText("Super Hamburger");
             Printer.addFeedLine();
             Printer.alignInPageRight();
-            Printer.addText(i + "");
+            Printer.addText(dishIndex + "");
             Printer.addSpaces((32 - str.length) / 2);
-            Printer.addText("" + i);
+            Printer.addText("" + dishIndex);
             Printer.addSpaces((32 - str.length) / 2);
-            Printer.addText("" + i + "1.00");
+            Printer.addText("" + dishIndex + "1.00");
             Printer.addFeedLine();
         }
         Printer.addFeedLines(2);
@@ -114,24 +178,19 @@ class BTPrintComponent extends Component {
         Printer.addSpaces(18 - MONEY.length);
         Printer.addText(MONEY);
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.alignInPageLeft();
         Printer.addText("--------------------------------");
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.addText("Cash Tendered");
         Printer.addSpaces(19 - 5);
         Printer.addText("88.00");
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.alignInPageRight();
         Printer.addText("--------------------------------");
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.addText("Change");
         Printer.addSpaces(26 - MONEY2.length);
         Printer.addText(MONEY2);
-        Printer.setTextSizeZoom1();
         Printer.addFeedLine();
         Printer.addText("--------------------------------");
         Printer.addFeedLines(2);
@@ -140,7 +199,6 @@ class BTPrintComponent extends Component {
             "This Servers as an\n" +
             "OFFICAL RECEIPT");
         Printer.addFeedLines(2);
-
         Printer.alignInPageLeft();
         Printer.addText(`Supplier:Chengdu 
         Jinjiang Center 
@@ -176,20 +234,19 @@ class BTPrintComponent extends Component {
 
     }
 
-    printLocalReceipt(data) {
-        Printer.initPrinter();
+    printChineseReceipt(data) {
+        Printer.initializePrinter();
         //Bluetooth.addHorTab();
         Printer.alignInPageCenter();
-        Printer.setTextSizeZoom2();
+        Printer.setFontSizeDouble();
         Printer.addText("what's your name");
         Printer.addFeedLines(3);
-        Printer.setTextSizeZoom1();
+        Printer.setFontSizeNormal();
         Printer.addText("我们店主张不求最好吃但求最贵");
         Printer.addFeedLine();
         Printer.alignInPageLeft();
         Printer.addText("--------------------------------");
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.alignInPageLeft();
         Printer.addText("单号:007");
         Printer.addText("  人数:2");
@@ -200,10 +257,8 @@ class BTPrintComponent extends Component {
         Printer.addFeedLine();
         Printer.addText("收银: 001|vally");
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.alignInPageLeft();
         Printer.addText("--------------------------------");
-        Printer.setTextSizeZoom1();
         Printer.addFeedLine();
         Printer.addText("品名");
         Printer.addFeedLine();
@@ -216,17 +271,17 @@ class BTPrintComponent extends Component {
         Printer.addFeedLine();
         Printer.addText("--------------------------------");
         Printer.addFeedLine();
-        for (let i = 8; i < 15; i++) {
-            let str = i + "" + i + "" + i + "1.00";
+        for (let dishIndex = 8; dishIndex < 15; dishIndex++) {
+            let str = dishIndex + "" + dishIndex + "" + dishIndex + "1.00";
             Printer.alignInPageLeft();
             Printer.addText("红烧小萝卜头");
             Printer.addFeedLine();
             Printer.alignInPageRight();
-            Printer.addText(i + "");
+            Printer.addText(dishIndex + "");
             Printer.addSpaces((32 - str.length) / 2);
-            Printer.addText("" + i);
+            Printer.addText("" + dishIndex);
             Printer.addSpaces((32 - str.length) / 2);
-            Printer.addText("" + i + "1.00");
+            Printer.addText("" + dishIndex + "1.00");
             Printer.addFeedLine();
         }
         Printer.alignInPageRight();
@@ -235,24 +290,19 @@ class BTPrintComponent extends Component {
         Printer.addSpaces(32 - (TOTAL_CONSUMPTION.length) * 2 - MONEY.length);
         Printer.addText(MONEY);
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.alignInPageLeft();
         Printer.addText("--------------------------------");
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.addText("应收");
         Printer.addSpaces(23);
         Printer.addText("88.00");
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.alignInPageRight();
         Printer.addText("--------------------------------");
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.addText("支付宝支付");
         Printer.addSpaces(32 - (PAY_METHOD.length) * 2 - MONEY2.length);
         Printer.addText(MONEY2);
-        Printer.setTextSizeZoom1();
         Printer.addFeedLine();
         Printer.addText("--------------------------------");
         Printer.addFeedLine();
@@ -263,14 +313,14 @@ class BTPrintComponent extends Component {
         Printer.print();
     }
 
-    printLocalReceipt80() {
-        Printer.initPrinter();
+    printChineseReceipt80() {
+        Printer.initializePrinter();
         //Bluetooth.addHorTab();
         Printer.alignInPageCenter();
-        Printer.setTextSizeZoom2();
+        Printer.setFontSizeDouble();
         Printer.addText("what's your name");
         Printer.addFeedLines(3);
-        Printer.setTextSizeZoom1();
+        Printer.setFontSizeNormal();
         Printer.addText("我们店主张不求最好吃但求最贵");
         Printer.addFeedLine();
         Printer.alignInPageLeft();
@@ -300,17 +350,17 @@ class BTPrintComponent extends Component {
         Printer.addFeedLine();
         Printer.addText("------------------------------------------------");
         Printer.addFeedLine();
-        for (let i = 8; i < 15; i++) {
-            let str = i + "" + i + "" + i + "1.00";
+        for (let dishIndex = 8; dishIndex < 15; dishIndex++) {
+            let str = dishIndex + "" + dishIndex + "" + dishIndex + "1.00";
             Printer.alignInPageLeft();
             Printer.addText("红烧小萝卜头");
             Printer.addFeedLine();
             Printer.alignInPageRight();
-            Printer.addText(i + "");
+            Printer.addText(dishIndex + "");
             Printer.addSpaces((48 - str.length) / 2);
-            Printer.addText("" + i);
+            Printer.addText("" + dishIndex);
             Printer.addSpaces((48 - str.length) / 2);
-            Printer.addText("" + i + "1.00");
+            Printer.addText("" + dishIndex + "1.00");
             Printer.addFeedLine();
         }
         Printer.addFeedLine();
@@ -343,10 +393,9 @@ class BTPrintComponent extends Component {
         Printer.print();
     }
 
-    printNationReceipt80() {
-        Printer.initPrinter();
+    printEnglishReceipt80() {
+        Printer.initializePrinter();
         Printer.alignInPageCenter();
-        Printer.setTextSizeZoom1();
         Printer.addText("We're 100 per cent Chinese\n" +
             "restaurant with Chinese stuffs\n" +
             "and chefs." +
@@ -372,7 +421,6 @@ class BTPrintComponent extends Component {
         Printer.alignInPageLeft();
         Printer.addText("------------------------------------------------");
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.alignInPageLeft();
         Printer.addText("ORDERNUM: 100120");
         Printer.addFeedLine();
@@ -382,7 +430,6 @@ class BTPrintComponent extends Component {
         Printer.addFeedLine();
         Printer.addText("TABLENUM: A-01");
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.alignInPageLeft();
         Printer.addText("------------------------------------------------");
         Printer.addFeedLine();
@@ -397,17 +444,17 @@ class BTPrintComponent extends Component {
         Printer.addFeedLine();
         Printer.addText("------------------------------------------------");
         Printer.addFeedLine();
-        for (let i = 8; i < 13; i++) {
-            let str = i + "" + i + "" + i + "1.00";
+        for (let dishIndex = 8; dishIndex < 13; dishIndex++) {
+            let str = dishIndex + "" + dishIndex + "" + dishIndex + "1.00";
             Printer.alignInPageLeft();
             Printer.addText("Super Hamburger");
             Printer.addFeedLine();
             Printer.alignInPageRight();
-            Printer.addText(i + "");
+            Printer.addText(dishIndex + "");
             Printer.addSpaces((48 - str.length) / 2);
-            Printer.addText("" + i);
+            Printer.addText("" + dishIndex);
             Printer.addSpaces((48 - str.length) / 2);
-            Printer.addText("" + i + "1.00");
+            Printer.addText("" + dishIndex + "1.00");
             Printer.addFeedLine();
         }
         Printer.addFeedLines(2);
@@ -416,24 +463,19 @@ class BTPrintComponent extends Component {
         Printer.addSpaces(34 - MONEY.length);
         Printer.addText(MONEY);
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.alignInPageLeft();
         Printer.addText("------------------------------------------------");
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.addText("Cash Tendered");
         Printer.addSpaces(35 - 5);
         Printer.addText("88.00");
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.alignInPageRight();
         Printer.addText("------------------------------------------------");
         Printer.addFeedLine();
-        Printer.setTextSizeZoom1();
         Printer.addText("Change");
         Printer.addSpaces(42 - MONEY2.length);
         Printer.addText(MONEY2);
-        Printer.setTextSizeZoom1();
         Printer.addFeedLine();
         Printer.addText("------------------------------------------------");
         Printer.addFeedLines(2);
@@ -499,6 +541,12 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: '#333333',
         marginBottom: 5,
+    },
+    imageStyle: {
+        width: 120,
+        height: 120,
+        margin: 10,
+        resizeMode: Image.resizeMode.contain
     },
 });
 module.exports = BTPrintComponent;
